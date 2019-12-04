@@ -17,7 +17,6 @@ limitations under the License.
 local System = System
 local throw = System.throw
 local Object = System.Object
-local String = System.String
 local Boolean = System.Boolean
 local Delegate = System.Delegate
 local getClass = System.getClass
@@ -307,17 +306,11 @@ local types = {
   [Number] = newNumberType(Number),
 }
 
-local customTypeOf = System.config.customTypeOf
-
 function typeof(cls)
   assert(cls)
   local t = types[cls]
   if t == nil then
-    if customTypeOf then
-      t = customTypeOf(cls)
-    else
-      t = setmetatable({ cls }, Type)
-    end
+    t = setmetatable({ cls }, Type)
     types[cls] = t
   end
   return t
@@ -357,11 +350,13 @@ local customTypeCheck = System.config.customTypeCheck
 local checks = setmetatable({}, {
   __index = function (checks, cls)
     if customTypeCheck then
-      local add, f = customTypeCheck(cls)
-      if add then
-        checks[cls] = f
+      local f, add = customTypeCheck(cls)
+      if f then
+        if add then
+          checks[cls] = f
+        end
+        return f
       end
-      return f
     end
 
     local set = getCheckSet(cls)
@@ -399,8 +394,49 @@ checks[Number] = function (obj, T)
   return check(obj, T)
 end
 
-local function is(obj, T)
-  return checks[getmetatable(obj)](obj, T)
+local is, getName
+
+if System.debugsetmetatable then
+  is = function (obj, T)
+    return checks[getmetatable(obj)](obj, T)
+  end
+
+  getName = function (obj)
+    return obj.__name__
+  end
+
+  System.getClassFromObj = getmetatable
+else
+  local function getClassFromObj(obj)
+    local t = type(obj)
+    if t == "number" then
+      return Number
+    elseif t == "boolean" then
+      return Boolean
+    elseif t == "function" then
+      return Delegate
+    end
+    return getmetatable(obj)
+  end
+
+  function System.ObjectGetType(this)
+    if this == nil then throw(NullReferenceException()) end
+    return typeof(getClassFromObj(this))
+  end
+
+  is = function (obj, T)
+    local base = getClassFromObj(obj)
+    if base then
+      return checks[base](obj, T)
+    end
+    return false
+  end
+
+  getName = function (obj)
+    return getClassFromObj(obj).__name__
+  end
+
+  System.getClassFromObj = getClassFromObj
 end
 
 System.is = is
@@ -417,7 +453,7 @@ local function cast(cls, obj, nullable)
     if is(obj, cls) then
       return obj
     end
-    throw(InvalidCastException(("Unable to cast object of type '%s' to type '%s'."):format(obj.__name__, cls.__name__)), 1)
+    throw(InvalidCastException(("Unable to cast object of type '%s' to type '%s'."):format(getName(obj), cls.__name__)), 1)
   else
     if cls.class ~= "S" or nullable then
       return nil

@@ -4,7 +4,7 @@ local UnityEngine = UnityEngine
 local ListInt32 = System.List(System.Int32)
 System.namespace("Sample", function (namespace)
   namespace.class("TestCoroutine", function (namespace)
-    local Awake, OnTick, Test, __ctor__
+    local Awake, OnTick, Test, T1, T2, __ctor__
     __ctor__ = function (this)
       this.list = ListInt32()
       System.base(this).__ctor__(this)
@@ -14,17 +14,36 @@ System.namespace("Sample", function (namespace)
       this:StartCoroutine(OnTick(this))
       UnityEngine.MonoBehaviour.print(this:getgameObject():getname())
       UnityEngine.MonoBehaviour.print(#this.list)
+      this:StartCoroutine(T1(this))
     end
     OnTick = function (this)
       return System.yieldIEnumerator(function (this)
         while true do
-          System.yieldReturn(UnityEngine.WaitForSeconds(1))
+          System.yield(UnityEngine.WaitForSeconds(1))
           UnityEngine.MonoBehaviour.print("TestCoroutine.OnTick")
         end
       end, System.Object, this)
     end
     Test = function (this)
       UnityEngine.MonoBehaviour.print("TestCoroutine.Test")
+    end
+    T1 = function (this)
+      return System.yieldIEnumerator(function (this)
+        UnityEngine.MonoBehaviour.print("a0")
+        System.yield(nil)
+        UnityEngine.MonoBehaviour.print("a1")
+        System.yield(T2(this))
+        UnityEngine.MonoBehaviour.print("a2")
+      end, System.Object, this)
+    end
+    T2 = function (this)
+      return System.yieldIEnumerator(function (this)
+        UnityEngine.MonoBehaviour.print("b0")
+        System.yield(nil)
+        UnityEngine.MonoBehaviour.print("b1")
+        System.yield(nil)
+        UnityEngine.MonoBehaviour.print("b2")
+      end, System.Object, this)
     end
     return {
       __inherits__ = function (out)

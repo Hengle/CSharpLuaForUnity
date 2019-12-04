@@ -7,6 +7,7 @@ local NotSupportedException = System.NotSupportedException
 local SystemType = System.Type
 local SystemListObject = System.List(System.Object)
 local SystemTypeof = System.typeof
+local SystemIEnumerator = System.IEnumerator
 local arrayFromList = System.arrayFromList
 local ArgumentNullException = System.ArgumentNullException
 local ArgumentOutOfRangeException = System.ArgumentOutOfRangeException
@@ -33,6 +34,7 @@ local Debugger = Debugger
 local BridgeMonoBehaviour = CSharpLua.BridgeMonoBehaviour
 local UnityEngine = UnityEngine
 local toluaSystem = toluaSystem
+local isFromCSharp = UnityEngine.isFromCSharp
 
 System.define("UnityEngine.Debug", {
   Log = Debugger.Log,
@@ -41,19 +43,24 @@ System.define("UnityEngine.Debug", {
   end,
 })
 
-local MonoBehaviour = System.define("MonoBehaviour", {
+local UnityEngineMonoBehaviour = UnityEngine.MonoBehaviour
+UnityEngine.MonoBehaviour = nil
+
+local MonoBehaviour = System.define("UnityEngine.MonoBehaviour", {
   __ctor__ = emptyFn,
   class = "C",
   GetType = System.Object.GetType,
-  ToString = function (this)
-    return sformat("%s (%s)", this.ref.gameObject.name, this.__name__)
-  end,
+  print = UnityEngineMonoBehaviour.print,
   Awake = emptyFn,
   Start = emptyFn,
   Update = emptyFn,
   FixedUpdate = emptyFn,
   LateUpdate = emptyFn,
+  ToString = function (this)
+    return sformat("%s (%s)", this.ref.gameObject.name, this.__name__)
+  end,
 })
+SystemTypeof(MonoBehaviour)[1] = UnityEngineMonoBehaviour
 
 local function getMonoBehaviourFunction(metatableOfMonoBehaviour, name)
   return metatableOfMonoBehaviour[name]   
@@ -62,14 +69,17 @@ end
 local metatableOfMonoBehaviour = getmetatable(BridgeMonoBehaviour) 
 setmetatable(MonoBehaviour, {
   __index = function (t, k)
-    if type(k) == "string" and sbyte(k, 1) ~= 95 then
-      local ok, f = pcall(getMonoBehaviourFunction, metatableOfMonoBehaviour, k)
-      if ok then
-        local v = function (this, ...)
-          return f(this.ref, ...)
+    if type(k) == "string" then
+      local c = sbyte(k, 1)
+      if c ~= 95 and c ~= 46 then -- not '.' or '_'
+        local ok, f = pcall(getMonoBehaviourFunction, metatableOfMonoBehaviour, k)
+        if ok then
+          local v = function (this, ...)
+            return f(this.ref, ...)
+          end
+          t[k] = v
+          return v
         end
-        t[k] = v
-        return v
       end
     end
     return nil
@@ -161,8 +171,8 @@ local function newMonoBehaviour(T, bridgeMonoBehaviour, state, serializeData, se
   return this
 end
 
-local function isFromCSharp(T)
-  return T.__gc ~= nil
+function System.IsIEnumerator(t)
+  return is(t, SystemIEnumerator)
 end
 
 local function isSystemType(t)
@@ -186,7 +196,7 @@ end
 local function addComponent(gameObject, T)
   if T == nil then throw(ArgumentNullException("type")) end
   if isSystemType(T) then
-    T = T.c
+    T = T[1]
   end
   if isFromCSharp(T) then
     if type(T) ~= "userdata" then
@@ -221,7 +231,7 @@ end
 local function getComponent(component, T)
   if T == nil then throw(ArgumentNullException("type")) end
   if isSystemType(T) then
-    T = T.c
+    T = T[1]
   end  
   if isFromCSharp(T) then
     if type(T) ~= "userdata" then
@@ -247,7 +257,7 @@ local function getComponentInChildren(component, T, includeInactive)
     if includeInactive == nil then
       includeInactive = false
     end
-    T = T.c
+    T = T[1]
   else
     if type(T) == "boolean" then
       T, includeInactive = includeInactive, T
@@ -269,7 +279,7 @@ rawset(metatableOfGameObject, "GetComponentInChildren", getComponentInChildren)
 local function getComponentInParent(component, T)
   if T == nil then throw(ArgumentNullException("type")) end
   if isSystemType(T) then
-    T = T.c 
+    T = T[1] 
   end
   if isFromCSharp(T) then
     if type(T) ~= "userdata" then
@@ -314,7 +324,7 @@ end
 local function getComponents(component, T, results)
   if T == nil then throw(ArgumentNullException("type")) end
   if isSystemType(T) then
-    T = T.c
+    T = T[1]
   elseif results then
     T, results = results, T
   end
@@ -326,7 +336,7 @@ rawset(metatableOfGameObject, "GetComponents", getComponents)
 local function getComponentsInChildren(component, T, includeInactive, results)
   if T == nil then throw(ArgumentNullException("type")) end
   if isSystemType(T) then
-    T = T.c
+    T = T[1]
     if includeInactive == nil then
       includeInactive = false
     end
@@ -357,7 +367,7 @@ rawset(metatableOfGameObject, "GetComponentsInChildren", getComponentsInChildren
 local function getComponentsInParent(component, T, includeInactive, results)
   if T == nil then throw(ArgumentNullException("type")) end
   if isSystemType(T) then
-    T = T.c
+    T = T[1]
     if includeInactive == nil then
       includeInactive = false
     end
@@ -451,7 +461,7 @@ end
 local function findObjectOfType(T)
   if T == nil then throw(ArgumentNullException("type")) end
   if isSystemType(T) then
-    T = T.c
+    T = T[1]
   end
   if isFromCSharp(T) then
     if type(T) ~= "userdata" then
@@ -495,24 +505,24 @@ end
 local function findObjectsOfType(T)
   if T == nil then throw(ArgumentNullException("type")) end
   if isSystemType(T) then
-    T = T.c
+    T = T[1]
   end
   return findBridgeObjectsOfType(sourceFindObjectsOfType, T)
 end
 
 local function findObjectsOfTypeAll(t)
   if t == nil then throw(ArgumentNullException("type")) end
-  return findBridgeObjectsOfType(sourceFindObjectsOfTypeAll, t.c)
+  return findBridgeObjectsOfType(sourceFindObjectsOfTypeAll, t[1])
 end
 
 local function findObjectsOfTypeIncludingAssets(t)
   if t == nil then throw(ArgumentNullException("type")) end
-  return findBridgeObjectsOfType(sourceFindObjectsOfTypeIncludingAssets, t.c)
+  return findBridgeObjectsOfType(sourceFindObjectsOfTypeIncludingAssets, t[1])
 end
 
 local function findSceneObjectsOfType(t)
   if t == nil then throw(ArgumentNullException("type")) end
-  return findBridgeObjectsOfType(sourceFindSceneObjectsOfType, t.c)
+  return findBridgeObjectsOfType(sourceFindSceneObjectsOfType, t[1])
 end
 
 local function op_Equality(x, y)
@@ -619,7 +629,7 @@ System.define("UnityEngine.JsonUtility", {
   FromJson = function (json, T)
     if T == nil then throw(ArgumentNullException("type")) end
     if isSystemType(T) then
-      T = T.c
+      T = T[1]
     end
     local t = cjsonDecode(json)
     fromJsonTable(t, T)
@@ -745,7 +755,7 @@ Vector3.getback = function() return newVector3(0, 0, -1) end
 Vector3.getzero = function() return newVector3(0, 0, 0) end
 Vector3.getone = function() return newVector3(1, 1, 1) end
 
-Vector3.getnormalized = Vector3.Magnitude
+Vector3.getmagnitude = Vector3.Magnitude
 Vector3.getsqrMagnitude = Vector3.SqrMagnitude
 Vector3.getnormalized = Vector3.Normalize
 
@@ -794,7 +804,7 @@ function Vector4.get(this, index)
   return getOfVector4(this, index, "Invalid Vector4 index!")
 end
 
-local function setOfVector4(this, inde, value, error)
+local function setOfVector4(this, index, value, error)
   if index < 0 or index > 2 then
     throw(ArgumentOutOfRangeException(error), 1)
   end

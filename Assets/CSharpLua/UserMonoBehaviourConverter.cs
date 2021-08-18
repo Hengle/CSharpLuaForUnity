@@ -14,6 +14,43 @@ using LuaInterface;
 
 namespace CSharpLua {
   public sealed class UserMonoBehaviourConverter {
+    private sealed class StructField {
+      private string s_;
+      public bool HasField { get; set; }
+
+      public StructField(object v) {
+        StringBuilder sb = new StringBuilder();
+        sb.Append('{');
+        Type t = v.GetType();
+        bool isFirst = true;
+        foreach (var field in t.GetFields(BindingFlags.Instance | BindingFlags.Public)) {
+          object x = field.GetValue(v);
+          if (x != null) {
+            var y = Activator.CreateInstance(x.GetType());
+            if (!x.EQ(y)) {
+              if (isFirst) {
+                isFirst = false;
+              } else {
+                sb.Append(',');
+              }
+              sb.Append(field.Name);
+              sb.Append('=');
+              sb.Append(SerializeFieldsInfo.NormalValueToString(x));
+              HasField = true;
+            }
+          }
+        }
+        sb.Append(',');
+        sb.Append(t.FullName);
+        sb.Append('}');
+        s_ = sb.ToString();
+      }
+
+      public override string ToString() {
+        return s_;
+      }
+    }
+
     private sealed class SerializeFieldsInfo {
       internal abstract class ObjectField {
         public string Name;
@@ -124,7 +161,7 @@ namespace CSharpLua {
         return sb.ToString();
       }
 
-      private static string NormalValueToString(object v) {
+      internal static string NormalValueToString(object v) {
         if (v is string) {
           return "\"" + v + "\"";
         }
@@ -195,8 +232,8 @@ namespace CSharpLua {
     }
 
     private void LoadClassNames() {
-      const string kBeginToken = "System.init({";
-      const string kEndToken = "})";
+      const string kBeginToken = "types = {";
+      const string kEndToken = "}";
 
       if (!File.Exists(compiledScriptsManifestPath_)) {
         PauseEdit();
@@ -412,7 +449,7 @@ namespace CSharpLua {
             x = System.Convert.ToDouble(x);
           }
         }
-        if (!EqualityComparer<object>.Default.Equals(x, y)) {
+        if (!x.EQ(y)) {
           info.Normals.Add(field.Name, x);
         }
         return;
@@ -423,6 +460,14 @@ namespace CSharpLua {
         int y = luaClass.RawGet<string, int>(field.Name);
         if (x != y) {
           info.Normals.Add(field.Name, x);
+        }
+        return;
+      }
+
+      if (fieldType.IsUnityEngineStruct()) {
+        var structField = new StructField(fieldValue);
+        if (structField.HasField) {
+          info.Normals.Add(field.Name, structField);
         }
         return;
       }
@@ -474,6 +519,16 @@ namespace CSharpLua {
 
     public static bool IsUnityEngineObject(this Type type) {
       return typeof(UnityEngine.Object).IsAssignableFrom(type);
+    }
+
+    public static bool EQ(this object x, object y) {
+      return EqualityComparer<object>.Default.Equals(x, y);
+    }
+    
+    public static bool IsUnityEngineStruct(this Type type) {
+      return type == typeof(Vector2)
+        || type == typeof(Vector3)
+        || type == typeof(Vector4);
     }
   }
 }

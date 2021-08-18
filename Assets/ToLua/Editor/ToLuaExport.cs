@@ -293,16 +293,16 @@ public static class ToLuaExport
                     continue;
                 }
 
-                if (args[i].Attributes != ParameterAttributes.Out)
+                if (args[i].ParameterType.IsByRef && (args[i].Attributes & ParameterAttributes.Out) != ParameterAttributes.None)
                 {
-                    list.Add(GetGenericBaseType(method, args[i].ParameterType));
+					Type genericClass = typeof(LuaOut<>);
+					Type t = genericClass.MakeGenericType(args[i].ParameterType.GetElementType());
+					list.Add(t);					
                 }
                 else
                 {
-                    Type genericClass = typeof(LuaOut<>);
-                    Type t = genericClass.MakeGenericType(args[i].ParameterType.GetElementType());
-                    list.Add(t);
-                }
+					list.Add(GetGenericBaseType(method, args[i].ParameterType));
+				}
             }
 
             for (int i = offset; i < list.Count - 1; i++)
@@ -465,7 +465,7 @@ public static class ToLuaExport
             {
                 ParameterInfo param = paramInfos[j];
                 string arg = "arg" + j;
-                bool beOutArg = param.Attributes == ParameterAttributes.Out;
+                bool beOutArg = param.ParameterType.IsByRef && ((param.Attributes & ParameterAttributes.Out) != ParameterAttributes.None);
                 bool beParams = IsParams(param);
                 Type t = GetGenericBaseType(method, param.ParameterType);
                 ProcessArg(t, head, arg, offset + j, j >= checkTypePos, beParams, beOutArg);
@@ -481,8 +481,8 @@ public static class ToLuaExport
                 }
                 else
                 {
-                    if (param.Attributes == ParameterAttributes.Out)
-                    {
+                    if ((param.Attributes & ParameterAttributes.Out) != ParameterAttributes.None)
+					{
                         sbArgs.Append("out arg");
                     }
                     else
@@ -814,6 +814,7 @@ public static class ToLuaExport
         GenEventFunctions();
         if (type.IsValueType && !type.IsEnum) 
         {
+            GenCSharpLuaValueTypeDefault();
             GenCSharpLuaValueTypeClone();
         }
 
@@ -1452,6 +1453,7 @@ public static class ToLuaExport
         
         if (type.IsValueType && !type.IsEnum) 
         {
+            sb.Append("\t\tL.RegFunction(\"default\", __default__);\r\n");
             sb.Append("\t\tL.RegFunction(\"__clone__\", __clone__);\r\n");
         }
 
@@ -3090,16 +3092,16 @@ public static class ToLuaExport
                 continue;
             }
 
-            if (p[i].Attributes != ParameterAttributes.Out)
-            {
-                list.Add(GetGenericBaseType(mb, p[i].ParameterType));
-            }
-            else
-            {
-                Type genericClass = typeof(LuaOut<>);
-                Type t = genericClass.MakeGenericType(p[i].ParameterType);
-                list.Add(t);
-            }
+			if (p[i].ParameterType.IsByRef && (p[i].Attributes & ParameterAttributes.Out) != ParameterAttributes.None)
+			{
+				Type genericClass = typeof(LuaOut<>);
+				Type t = genericClass.MakeGenericType(p[i].ParameterType);
+				list.Add(t);				
+			}
+			else
+			{
+				list.Add(GetGenericBaseType(mb, p[i].ParameterType));
+			}
         }
 
         for (int i = offset; i < list.Count - 1; i++)
@@ -3317,6 +3319,18 @@ public static class ToLuaExport
       sb.AppendLineEx("\t}");
   }
 
+  private static void GenCSharpLuaValueTypeDefault() {
+    sb.AppendLineEx("\r\n\t[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]");
+    sb.AppendFormat("\tstatic int __default__(IntPtr L)\r\n");
+    sb.AppendLineEx("\t{");
+    BeginTry();
+    sb.AppendFormat("\t\t\tvar o = new {0}();\r\n", className);
+    sb.Append("\t\t\tToLua.PushValue(L, o);\r\n");
+    sb.AppendLineEx("\t\t\treturn 1;");
+    EndTry();
+    sb.AppendLineEx("\t}");
+  }
+
   private static void GenCSharpLuaValueTypeClone() 
   {
       sb.AppendLineEx("\r\n\t[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]");
@@ -3328,7 +3342,7 @@ public static class ToLuaExport
       sb.Append("\t\t\tvar o = obj;\r\n");
       sb.Append("\t\t\tToLua.PushValue(L, o);\r\n");
       sb.Append("\t\t\tToLua.SetBack(L, 1, obj);\r\n");
-      sb.AppendLineEx("\t\t\treturn 0;");
+      sb.AppendLineEx("\t\t\treturn 1;");
       EndTry();
       sb.AppendLineEx("\t}");
   }
@@ -3661,7 +3675,7 @@ public static class ToLuaExport
                 {
                     sb.AppendFormat("{2}\tfunc.PushByteBuffer(param{1});\r\n", push, i, head);
                 }
-                else if (pi[i].Attributes != ParameterAttributes.Out)
+                else if ((pi[i].Attributes & ParameterAttributes.Out) == ParameterAttributes.None)
                 {
                     sb.AppendFormat("{2}\tfunc.{0}(param{1});\r\n", push, i, head);
                 }
@@ -4088,8 +4102,8 @@ public static class ToLuaExport
 
         for (int i = 0; i < pis.Length; i++)
         {
-            if (pis[i].Attributes == ParameterAttributes.Out)
-            {
+            if ((pis[i].Attributes & ParameterAttributes.Out) != ParameterAttributes.None)
+			{
                 str += string.Format("\t\t\t\tparam{0} = {1};\r\n", i, GetReturnValue(pis[i].ParameterType.GetElementType()));
                 flag = true;
             }

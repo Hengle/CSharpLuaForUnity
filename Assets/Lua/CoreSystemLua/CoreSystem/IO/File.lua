@@ -27,7 +27,7 @@ local remove = os.remove
 
 local IOException = define("System.IO.IOException", {
   __tostring = System.Exception.ToString,
-  __inherits__ = { System.Exception },
+  base = { System.Exception },
   __ctor__ = function(this, message, innerException) 
     System.Exception.__ctor__(this, message or "I/O error occurred.", innerException)
   end,
@@ -70,7 +70,7 @@ define("System.IO.File", {
     end
     return System.arrayFromTable(t, System.String)
   end,  
-  WriteWriteAllBytes = function (path, contents)
+  WriteAllBytes = function (path, contents)
     writeAll(path, contents, "wb")
   end,
   WriteAllText = function (path, contents)

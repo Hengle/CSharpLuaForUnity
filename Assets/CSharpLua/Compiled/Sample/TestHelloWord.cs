@@ -2,9 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using UnityEditor;
 using UnityEngine;
 
 namespace Sample {
@@ -21,6 +18,8 @@ namespace Sample {
       GameObject i = TestUtils.Load("Assets/CSharpLua/Examples/01_HelloWorld/TestLoader.prefab");
       var obj = Instantiate(i);
       obj.transform.parent = transform;
+
+      TestProtobuf.Run();
     }
 
     private void Start() {

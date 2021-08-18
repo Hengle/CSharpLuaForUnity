@@ -42,12 +42,12 @@ local select = select
 
 local TargetException = define("System.Reflection.TargetException", {
   __tostring = Exception.ToString,
-  __inherits__ = { Exception }
+  base = { Exception }
 })
 
 local TargetParameterCountException = define("System.Reflection.TargetParameterCountException", {
   __tostring = Exception.ToString,
-  __inherits__ = { Exception },
+  base = { Exception },
   __ctor__ = function(this, message, innerException) 
     Exception.__ctor__(this, message or "Parameter count mismatch.", innerException)
   end,
@@ -55,7 +55,7 @@ local TargetParameterCountException = define("System.Reflection.TargetParameterC
 
 local AmbiguousMatchException = define("System.Reflection.AmbiguousMatchException", {
   __tostring = Exception.ToString,
-  __inherits__ = { System.SystemException },
+  base = { System.SystemException },
   __ctor__ = function(this, message, innerException) 
     Exception.__ctor__(this, message or "Ambiguous match found.", innerException)
   end,
@@ -63,7 +63,7 @@ local AmbiguousMatchException = define("System.Reflection.AmbiguousMatchExceptio
 
 local MissingMethodException = define("System.MissingMethodException", {
   __tostring = Exception.ToString,
-  __inherits__ = { Exception },
+  base = { Exception },
   __ctor__ = function(this, message, innerException) 
     Exception.__ctor__(this, message or "Specified method could not be found.", innerException)
   end
@@ -225,7 +225,7 @@ end
 
 local FieldInfo = define("System.Reflection.FieldInfo", {
   __eq = eq,
-  __inherits__ = { MemberInfo },
+  base = { MemberInfo },
   memberType = 4,
   getFieldType = getFieldOrPropertyType,
   GetValue = getOrSetField,
@@ -361,7 +361,7 @@ end
 
 local PropertyInfo = define("System.Reflection.PropertyInfo", {
   __eq = eq,
-  __inherits__ = { MemberInfo },
+  base = { MemberInfo },
   memberType = 16,
   getPropertyType = getFieldOrPropertyType,
   GetValue = getOrSetProperty,
@@ -424,7 +424,7 @@ end
 
 local MethodInfo = define("System.Reflection.MethodInfo", {
   __eq = eq,
-  __inherits__ = { MemberInfo },
+  base = { MemberInfo },
   memberType = 8,
   getReturnType = function (this)
     local metadata = this.metadata
@@ -787,9 +787,62 @@ function Type.GetCustomAttributes(this, attributeType, inherit)
   return arrayFromTable(t, System.Attribute)
 end
 
-local assembly
-local function getAssembly()
-  return assembly
+local Assembly, coreSystemAssembly
+local function getAssembly(t)
+  local assembly = t[1].__assembly__
+  if assembly then
+    return setmetatable(assembly, Assembly)
+  end
+  return coreSystemAssembly
+end
+
+local function getAssemblyName(this)
+  local name = this.name or "CSharpLua.CoreLib"
+  return name .. ", Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+end
+
+Assembly = define("System.Reflection.Assembly", {
+  GetName = getAssemblyName,
+  getFullName = getAssemblyName,
+  GetAssembly = getAssembly,
+  GetTypeFrom = Type.GetTypeFrom,
+  GetEntryAssembly = function ()
+    local entryAssembly = System.entryAssembly
+    if entryAssembly then
+      return setmetatable(entryAssembly, Assembly)
+    end
+    return nil
+  end,
+  getEntryPoint = function (this)
+    local entryPoint = this.entryPoint
+    if entryPoint ~= nil then
+      local _, _, t, name = entryPoint:find("(.*)%.(.*)")
+      local cls = getClass(t)
+      local f = assert(cls[name])
+      return buildMethodInfo(cls, name, nil, f)
+    end
+    return nil
+  end,
+  GetExportedTypes = function (this)
+    if this.exportedTypes then
+      return this.exportedTypes
+    end
+    local t = {}
+    local classes = this.classes
+    if classes then
+      for i = 1, #classes do
+        t[i] = typeof(classes[i])
+      end
+    end
+    local array = arrayFromTable(t, Type, true)
+    this.exportedTypes = array
+    return array
+  end
+})
+coreSystemAssembly = Assembly()
+
+function System.GetExecutingAssembly(assembly)
+	return setmetatable(assembly, Assembly)
 end
 
 Type.getAssembly = getAssembly
@@ -849,56 +902,36 @@ function Type.GetGenericArguments(this)
   return arrayFromTable(t, Type)
 end
 
-local Assembly = define("System.Reflection.Assembly", {
-  GetName = getName,
-  getFullName = getName,
-  GetAssembly = getAssembly,
-  GetCallingAssembly = getAssembly,
-  GetEntryAssembly = getAssembly,
-  GetExecutingAssembly = getAssembly,
-  GetTypeFrom = Type.GetTypeFrom,
-  getEntryPoint = function ()
-    local entryPoint = System.entryPoint
-    if entryPoint ~= nil then
-      local _, _, t, name = entryPoint:find("(.*)%.(.*)")
-      local cls = getClass(t)
-      local f = assert(cls[name])
-      return buildMethodInfo(cls, name, nil, f)
-    end
-  end,
-  GetExportedTypes = function (this)
-    if this.exportedTypes then
-      return this.exportedTypes
-    end
-    local classes = System.classes
-    local t = {}
-    local count = 1
-    for i = 1, #classes do
-      t[count] = typeof(classes[i])
-      count = count + 1
-    end
-    local array = arrayFromTable(t, Type, true)
-    this.exportedTypes = array
-    return array
-  end
-})
+local Attribute = System.Attribute
 
-assembly = Assembly()
-assembly.name = System.config.assemblyName or "CSharp.lua, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+function Attribute.GetCustomAttribute(element, attributeType, inherit)
+  return element:GetCustomAttribute(attributeType, inherit)
+end
+
+function Attribute.GetCustomAttributes(element, attributeType, inherit)
+  return element:GetCustomAttributes(attributeType, inherit)
+end
+
+function Attribute.IsDefined(element, attributeType, inherit)
+	return element:IsDefined(attributeType, inherit)
+end
 
 local function createInstance(T, nonPublic)
   local metadata = rawget(T, "__metadata__")
   if metadata then
-    local ctorMetadata = metadata.methods[1]
-    if ctorMetadata[1] == ".ctor" then
-      local flags = ctorMetadata[2]
-      if nonPublic or hasPublicFlag(flags) then
-        local parameterCount = getMethodParameterCount(flags)
-        if parameterCount == 0 then
-          return T()
+    local methods = metadata.methods
+    if methods then
+      local ctorMetadata = methods[1]
+      if ctorMetadata[1] == ".ctor" then
+        local flags = ctorMetadata[2]
+        if nonPublic or hasPublicFlag(flags) then
+          local parameterCount = getMethodParameterCount(flags)
+          if parameterCount == 0 then
+            return T()
+          end
         end
+        throw(MissingMethodException())
       end
-      throw(MissingMethodException())
     end
   end
   return T()

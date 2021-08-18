@@ -3,10 +3,12 @@ CSharpLuaForUnity尝试使用[CSharp.lua](https://github.com/yanghuan/CSharp.lua
 
 ## 依赖说明
 * 使用[tolua](https://github.com/topameng/tolua)版本作为Lua支持环境
+* 使用[LuaFramework_UGUI_V2](https://github.com/jarjin/LuaFramework_UGUI_V2)编译的动态链接tolua库(集成了pbc)
 * 使用[CSharp.lua](https://github.com/yanghuan/CSharp.lua)来将C#代码转换至Lua
 
+
 ## 如何使用
-* 在Unity编辑器环境下，会新增菜单项'CSharpLua',子菜单'Compile'可将工程目录[Compiled](https://github.com/yanghuan/CSharpLuaForUnity/tree/master/Assets/CSharpLua/Compiled)下的C#代码编译成Lua代码放置到Assets/Lua/Compiled目录，子菜单'Switch to XXX'可在运行C#代码还是编译后的Lua代码中切换。设想的是实际开发中一直使用C#代码开发和调试，需要真机发布时，才编译到Lua代码。
+* 在Unity编辑器环境下，会新增菜单项'CSharpLua',子菜单'Compile'可将工程目录[Compiled](https://github.com/yanghuan/CSharpLuaForUnity/tree/master/Assets/CSharpLua/Compiled)下的C#代码编译成Lua代码放置到Assets/Lua/Compiled目录，子菜单'Switch to XXX'可在运行C#代码还是编译后的Lua代码中切换。**设想的是实际开发中一直使用C#代码开发和调试，需要真机发布时，才编译到Lua代码**。
 * [Examples](https://github.com/yanghuan/CSharpLuaForUnity/tree/master/Assets/CSharpLua/Examples)目录下有一个简易的列子,可直接运行。可以看出能够支持在预设中挂载自定义的C#脚本，在运行Lua代码时，预设会被动态适配处理，具体实现可见代码。因而在打包时也需要对存在挂载了自定义C#脚本的的预设做相同的处理。
 
 ## 项目结构
@@ -28,5 +30,8 @@ Assembly-CSharp.dll --------> Compiled.dll --------> Bridge.dll --------> Base.d
 * https://github.com/jarjin/LuaFramework_UGUI_V2
 
 ## 相关工程
-也可以考虑使用ILRuntime完成类似的需求
-https://github.com/Ourpalm/ILRuntime
+* DCET 在ET框架的基础上集成了CSharp.lua和**xlua**  
+  https://github.com/DukeChiang/DCET
+* ILRuntime C#实现的IL运行环境   
+  https://github.com/Ourpalm/ILRuntime
+

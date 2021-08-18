@@ -38,10 +38,20 @@ local isFromCSharp = UnityEngine.isFromCSharp
 
 System.define("UnityEngine.Debug", {
   Log = Debugger.Log,
+  LogFormat = function (format, ...)
+    Debugger.Log(format:Format(...))
+  end,
   LogErrorFormat = function (format, ...)
     Debugger.LogError(format:Format(...))
   end,
 })
+
+System.typeof = function (cls)
+  if isFromCSharp(cls) then
+    return typeof(cls)
+  end
+  return SystemTypeof(cls)
+end
 
 local UnityEngineMonoBehaviour = UnityEngine.MonoBehaviour
 UnityEngine.MonoBehaviour = nil
@@ -661,6 +671,7 @@ local function inherits(_, T)
 end
 
 local Vector2 = UnityEngine.Vector2
+Vector2.x, Vector2.y = 0, 0
 local newVector2 = Vector2.New
 UnityEngine.Vector2 = nil
 
@@ -712,11 +723,12 @@ end
 Vector2.Equals = equalsOfVector2
 Vector2.ToString = Vector2.__tostring
 Vector2.__clone__ = Vector2.Clone
-Vector2.__inherits__ = inherits
+Vector2.base = inherits
 
 defineUnityStruct("UnityEngine.Vector2", Vector2)
 
 local Vector3 = UnityEngine.Vector3
+Vector3.x, Vector3.y, Vector3.z = 0, 0, 0
 local newVector3 = Vector3.New
 UnityEngine.Vector3 = nil
 
@@ -777,11 +789,12 @@ end
 Vector3.Equals = equalsOfVector3
 Vector3.ToString = Vector3.__tostring
 Vector3.__clone__ = Vector3.Clone
-Vector3.__inherits__ = inherits
+Vector3.base = inherits
 
 defineUnityStruct("UnityEngine.Vector3", Vector3)
 
 local Vector4 = UnityEngine.Vector4
+Vector4.x, Vector4.y, Vector4.z, Vector4.w = 0, 0, 0, 0
 local newVector4 = Vector4.New
 UnityEngine.Vector4 = nil
 
@@ -820,7 +833,7 @@ local function setOfVector4(this, index, value, error)
 end
 
 function Vector4.set(this, index, value) 
-  setOfVector4(this, inde, value, "Invalid Vector4 index!")
+  setOfVector4(this, index, value, "Invalid Vector4 index!")
 end
 
 Vector4.getzero = function() return newVector4(0, 0, 0, 0) end
@@ -843,7 +856,7 @@ end
 Vector4.Equals = equalsOfVector4
 Vector4.ToString = Vector4.__tostring
 Vector4.__clone__ = Vector4.Clone
-Vector4.__inherits__ = inherits
+Vector4.base = inherits
 
 defineUnityStruct("UnityEngine.Vector4", Vector4)
 
@@ -928,7 +941,7 @@ end
 Color.Equals = equalsOfColor
 Color.ToString = Color.__tostring
 Color.__clone__ = function(this) return newColor(this.r, this.g, this.b, this.a) end
-Color.__inherits__ = inherits
+Color.base = inherits
 
 defineUnityStruct("UnityEngine.Color", Color)
 
@@ -947,7 +960,7 @@ UnityEngine.Color32 = nil
 
 Color32.ToString = Color32.__tostring
 Color32.__clone__ = function (this) return newColor32(this.r, this.g, this.b, this.a) end
-Color32.__inherits__ = System.emptyFn
+Color32.base = System.emptyFn
 
 function Color32.EqualsObj(this, other)
   if getmetatable(other) ~= Color32 then
@@ -975,7 +988,7 @@ function Quaternion.get(this, index)
 end
 
 function Quaternion.set(this, index, value)
-  setOfVector4(this, inde, value, "Invalid Quaternion index!")
+  setOfVector4(this, index, value, "Invalid Quaternion index!")
 end
 
 Quaternion.getidentity = function() return newQuaternion(0, 0, 0, 1) end
@@ -993,7 +1006,7 @@ end
 Quaternion.Equals = equalsOfVector4
 Quaternion.ToString = Quaternion.__tostring
 Quaternion.__clone__ = Quaternion.Clone
-Quaternion.__inherits__ = inherits
+Quaternion.base = inherits
 
 defineUnityStruct("UnityEngine.Quaternion", Quaternion)
 
@@ -1019,7 +1032,7 @@ end
 Bounds.Equals = equalsOfBounds
 Bounds.ToString = Quaternion.__tostring
 Bounds.__clone__ = function (this) return newBounds(this.center, this.extents) end
-Bounds.__inherits__ = inherits
+Bounds.base = inherits
 
 defineUnityStruct("UnityEngine.Bounds", Bounds)
 
@@ -1051,7 +1064,7 @@ Plane.__call = function (cls, a, b, c)
   end
 end
 
-Plane.__inherits__ = System.emptyFn
+Plane.base = System.emptyFn
 defineUnityStruct("UnityEngine.Plane", Plane)
 
 local LayerMask = UnityEngine.LayerMask
@@ -1061,5 +1074,26 @@ UnityEngine.LayerMask = nil
 LayerMask.__clone__ = function (this) return newLayerMask(this.value) end
 UnityEngine.ToLayerMask = newLayerMask
 
-LayerMask.__inherits__ = System.emptyFn
+LayerMask.base = System.emptyFn
 defineUnityStruct("UnityEngine.LayerMask", LayerMask)
+
+local Ray = UnityEngine.Ray
+local newRay = Ray.New
+UnityEngine.Ray = nil
+
+Ray.__clone__ = function (this) return newRay(this.direction, this.origin) end
+Ray.ToString = Ray.__tostring
+Ray.base = System.emptyFn
+defineUnityStruct("UnityEngine.Ray", Ray)
+
+local RaycastHit = UnityEngine.RaycastHit
+local newRaycastHit = RaycastHit.New
+UnityEngine.RaycastHit = nil
+
+RaycastHit.distance = 0.0
+RaycastHit.normal = Vector3.zero
+RaycastHit.point = Vector3.zero
+RaycastHit.__clone__ = function (this) return newRaycastHit(this.collider, this.distance, this.normal, this.point, this.rigidbody, this.transform) end
+RaycastHit.base = System.emptyFn
+defineUnityStruct("UnityEngine.RaycastHit", RaycastHit)
+

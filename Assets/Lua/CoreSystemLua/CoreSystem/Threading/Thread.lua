@@ -38,7 +38,7 @@ local mainThread
 
 local ThreadStateException = define("System.Threading.ThreadStateException", {
   __tostring = Exception.ToString,
-  __inherits__ = { Exception },
+  base = { Exception },
 
   __ctor__ = function(this, message, innerException)
      Exception.__ctor__(this, message or "Thread is running or terminated; it cannot restart.", innerException)
@@ -47,7 +47,7 @@ local ThreadStateException = define("System.Threading.ThreadStateException", {
 
 local ThreadAbortException = define("System.Threading.ThreadAbortException", {
   __tostring = Exception.ToString,
-  __inherits__ = { Exception },
+  base = { Exception },
   __ctor__ = function(this, message, innerException)
     Exception.__ctor__(this, message or "Thread aborted.", innerException)
 end
@@ -73,10 +73,11 @@ local function checkTimeout(timeout)
 end
 
 local function resume(t, obj)
+  local prevThread = currentThread
   currentThread = t
   local co = assert(t.co)
   local ok, v = cresume(co, obj)
-  currentThread = mainThread
+  currentThread = prevThread
   if ok then
     if type(v) == "function" then
       v()
@@ -127,7 +128,8 @@ local Thread =  define("System.Threading.Thread", {
     return id
   end,
   Sleep = function (timeout)
-    if currentThread == mainThread then
+    local current = currentThread
+    if current == mainThread then
       throw(NotSupportedException("mainThread not support"))
     end
     timeout = checkTimeout(timeout)
@@ -135,18 +137,19 @@ local Thread =  define("System.Threading.Thread", {
     if timeout ~= -1 then
       f = function ()
         addTimer(function () 
-          resume(currentThread) 
+          resume(current) 
         end, timeout)
       end
     end
     cyield(f)
   end,
   Yield = function ()
-    if currentThread == mainThread then
+    local current = currentThread
+    if current == mainThread then
       return false
     end
     cyield(function ()
-      run(currentThread)
+      run(current)
     end)
     return true
   end,
